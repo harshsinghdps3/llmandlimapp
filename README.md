@@ -6,6 +6,7 @@ This project contains two simple web applications built with Streamlit and Googl
 
 *   **Q&A App (`app.py`):** A text-based chatbot that answers your questions using the Gemini model.
 *   **Vision App (`vision.py`):** An application that lets you upload an image and ask questions about it.
+*   **Q&A Chatbot (`qnachatbot.py`):** A conversational chatbot that remembers chat history and answers your questions using the Gemini Pro model.
 
 ## Setup and Usage
 
@@ -42,4 +43,9 @@ This project contains two simple web applications built with Streamlit and Googl
     For the Vision app:
     ```bash
     streamlit run vision.py
+    ```
+
+    For the Q&A Chatbot:
+    ```bash
+    streamlit run qnachatbot.py
     ```
