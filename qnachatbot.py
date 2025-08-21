@@ -1,50 +1,66 @@
+
+
 from dotenv import load_dotenv
 load_dotenv()
 
-import streamlit as st
 import os
+import streamlit as st
 import google.generativeai as gai
 
-# Configure the Gemini API with the key from environment variables
-gai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# ──────────────────  API-Key Validation  ──────────────────
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    st.error("⚠️  GOOGLE_API_KEY missing! .env file mein key add karo phir reload karo.")
+    st.stop()
 
-# Function to load Gemini Pro model and get responses
-model = gai.GenerativeModel("gemini-2.5-pro")
-chat = model.start_chat(history=[])
+gai.configure(api_key=api_key)
 
-def get_gemini_response(question):
+# ──────────────────  Per-Session Gemini Chat  ─────────────
+if "gemini_chat" not in st.session_state:
+    model = gai.GenerativeModel("gemini-2.5-pro")           # Configurable later
+    st.session_state.gemini_chat = model.start_chat(history=[])
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []                      # For UI display only
+
+chat = st.session_state.gemini_chat                         # Shortcut
+
+# ──────────────────  Safe Gemini Call  ──────────────────
+def get_gemini_response(prompt: str) -> str:
     """
-    Sends a question to the Gemini model and returns the streaming response.
+        Sends the user prompt to Gemini, displays streaming chunks in real-time,
+        and finally returns as a single string. Handles API failures gracefully.
     """
-    response = chat.send_message(question, stream=True)
-    return response
+    try:
+        stream = chat.send_message(prompt, stream=True)
+        chunks = []
+        for chunk in stream:          # Real-time token stream
+            st.write(chunk.text)      # Immediate feedback to user
+            chunks.append(chunk.text)
+        return "".join(chunks)
+    except Exception as err:
+        st.error(f"Gemini API error {err}")
+        return "Sorry, a technical issue occurred."
 
-# Initialize our Streamlit app
-st.set_page_config(page_title="Q&A Demo")
-st.header("Gemini LLM Application")
+# ──────────────────  Streamlit Page Setup  ─────────────────
+st.set_page_config(page_title="Gemini Q&A Demo", page_icon="💬", layout="wide")
+st.title("💎 Gemini LLM Application")
 
-# Initialize session state for chat history if it doesn't exist
-if 'chat_history' not in st.session_state:
-    st.session_state['chat_history'] = []
+# ────────────────── User Input (chat-style widget) ────────────────────
+user_prompt = st.chat_input("Type your question here…")
 
-# Input field and submit button
-input_text = st.text_input("Input:", key="input")
-submit_button = st.button("Ask the question")
+# ────────────────── Main Interaction Logic  ─────────────
+if user_prompt:
+    st.session_state.chat_history.append(("You", user_prompt))  # Store user msg
 
-# If the submit button is clicked and there's input
-if submit_button and input_text:
-    response = get_gemini_response(input_text)
-    
-    # Add user query to session chat history
-    st.session_state['chat_history'].append(("You", input_text))
-    
-    st.subheader("The Response is")
-    # Display the streaming response and add bot's response to history
-    for chunk in response:
-        st.write(chunk.text)
-        st.session_state['chat_history'].append(("Bot", chunk.text))
+    with st.spinner("Gemini is thinking…"):                   # UX spinner
+        bot_reply = get_gemini_response(user_prompt)
 
-# Display the chat history
-st.subheader("The Chat history is")
-for role, text in st.session_state['chat_history']:
-    st.write(f"{role}: {text}")
+    # Consolidated single bot entry 
+    st.session_state.chat_history.append(("Bot", bot_reply))
+
+# ──────────────────  Chat History Rendering  ─────────
+st.subheader("📜 Chat History")
+for role, msg in st.session_state.chat_history:
+    avatar = "🧑" if role == "You" else "🤖"
+    st.write(f"{avatar} **{role}**: {msg}")
